@@ -17,7 +17,15 @@
 
 namespace WalkingControllers {
     class JointsSinks;
+
+    enum class ControlModes;
 }
+
+enum class WalkingControllers::ControlModes {
+    Position,
+    PositionDirect,
+    Velocity
+};
 
 class WalkingControllers::JointsSinks {
 public:
@@ -25,11 +33,13 @@ public:
 
     virtual ~JointsSinks();
 
-    virtual bool setControlMode(int controlMode) = 0;
+    virtual bool setControlMode(const WalkingControllers::ControlModes &controlMode) = 0;
 
-    virtual bool setDesiredPositions(const iDynTree::VectorDynSize& jointsPositionsInRad) = 0;
+    virtual bool setPositionReference(const iDynTree::VectorDynSize& jointsPositionsInRad, double positioningTimeInSec = 5.0) = 0;
 
-    virtual bool setDesiredVelocities(const iDynTree::VectorDynSize& jointsVelInRadPerSec) = 0;
+    virtual bool setDirectPositionReference(const iDynTree::VectorDynSize& jointsPositionsInRad) = 0;
+
+    virtual bool setVelocityReference(const iDynTree::VectorDynSize& jointsVelInRadPerSec) = 0;
 
     virtual bool setPositionPIDs(const std::vector<yarp::dev::Pid>& positionPIDs) = 0;
 

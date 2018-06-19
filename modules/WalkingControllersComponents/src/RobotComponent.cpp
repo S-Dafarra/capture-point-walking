@@ -15,6 +15,7 @@
 #include <yarp/dev/IEncodersTimed.h>
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IPositionControl.h>
+#include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/IControlMode.h>
 #include <yarp/dev/ControlBoardInterfaces.h>
 #include <yarp/dev/IPidControl.h>
@@ -23,6 +24,8 @@
 #include <yarp/dev/IRemoteVariables.h>
 
 #include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/Core/EigenHelpers.h>
+#include <Eigen/Dense>
 
 #include <memory>
 #include <cassert>
@@ -38,9 +41,6 @@ class AllJointsSources : public JointsSources {
     yarp::dev::IEncodersTimed* m_encodersInterface;
     yarp::dev::IPidControl* m_pidInterface;
     yarp::dev::IRemoteVariables* m_remoteVariablesInterface;
-//    yarp::dev::IPositionDirect* m_positionDirectInterface;
-//    yarp::dev::IPositionControl* m_positionInterface;
-//    yarp::dev::IControlMode* m_controlModeInterface;
     yarp::dev::IAxisInfo* m_axisInfo;
     yarp::dev::IControlLimits* m_limitsInfo;
     yarp::sig::Vector m_positionFeedbackInDegrees;
@@ -48,7 +48,6 @@ class AllJointsSources : public JointsSources {
     std::vector<std::string> m_allJoints;
     bool m_configured;
 
-protected:
     friend class WalkingControllers::RobotComponent;
     AllJointsSources()
         : m_robotDriver(nullptr)
@@ -65,6 +64,8 @@ protected:
             yError() << "[AllJointsSources::configure] Empty robotDriver pointer.";
             return false;
         }
+
+        m_robotDriver = robotDriver;
 
         if (!m_robotDriver->view(m_encodersInterface) || !m_encodersInterface)
         {
@@ -90,24 +91,6 @@ protected:
             return false;
         }
 
-//        if (!m_robotDriver->view(m_positionInterface) || !m_positionInterface)
-//        {
-//            yError() << "[AllJointsSources::configure]Cannot obtain IPositionControl interface";
-//            return false;
-//        }
-
-//        if (!m_robotDriver->view(m_positionDirectInterface) || !m_positionDirectInterface)
-//        {
-//            yError() << "[AllJointsSources::configure]Cannot obtain IPositionDirect interface";
-//            return false;
-//        }
-
-//        if (!m_robotDriver->view(m_controlModeInterface) || !m_controlModeInterface)
-//        {
-//            yError() << "[AllJointsSources::configure]Cannot obtain IControlMode interface";
-//            return false;
-//        }
-
         if (!m_robotDriver->view(m_axisInfo) || !m_axisInfo){
             yError() << "[AllJointsSources::configure]Cannot obtain IAxisInfo interface";
             return false;
@@ -128,67 +111,8 @@ protected:
             m_allJoints.push_back(axisName);
         }
 
-//        if(!getJointList(rf)){
-//            return false;
-//        }
-
-//        if (m_controlledJoints.empty()) {
-//            //control all joints
-//            yWarning() << "No joint list provided. Using the full robot.";
-//            m_controlledJoints = m_allJoints;
-//            for (int i = 0; i < axes; ++i) {
-//                m_controlledJointsIndices.push_back(i);
-//            }
-//        } else {
-//            //control only the chosen one
-//            for (auto& controlledJoint : m_controlledJoints) {
-//                std::vector<std::string>::iterator controlBoardIndex = std::find(m_allJoints.begin(), m_allJoints.end(), controlledJoint);
-//                if (controlBoardIndex == m_allJoints.end()) {
-//                    yError("Axes %s not found in control board", controlledJoint.c_str());
-//                    close();
-//                    return false;
-//                }
-//                m_controlledJointsIndices.push_back(static_cast<int>(std::distance(m_allJoints.begin(), controlBoardIndex)));
-//            }
-//        }
-
         m_positionFeedbackInDegrees.resize(static_cast<unsigned int>(m_allJoints.size()));
         m_positionFeedbackInDegrees.zero();
-
-//        m_encoderBuffer.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_encoderBuffer.zero();
-
-//        m_positionFeedbackInRadians.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_positionFeedbackInRadians.zero();
-
-//        m_previousPositionFeedbackInRadians.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_previousPositionFeedbackInRadians.zero();
-
-//        m_toDegBuffer.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_toDegBuffer.zero();
-
-//        m_velocityFeedbackInDegrees.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_velocityFeedbackInDegrees.zero();
-//        m_velocityFeedbackInRadians.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_velocityFeedbackInRadians.zero();
-
-//        m_positionFeedbackInDegreesFiltered.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_positionFeedbackInDegreesFiltered.zero();
-
-//        m_velocityFeedbackInDegreesFiltered.resize(static_cast<unsigned int>(m_allJoints.size()));
-//        m_velocityFeedbackInDegreesFiltered.zero();
-
-//        m_qResult.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_qResult.zero();
-
-//        m_initialJointValuesInRadYarp.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_initialJointValuesInRadYarp.zero();
-//        m_desiredJointInRadYarp.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_desiredJointInRadYarp.zero();
-//        m_initialJointValuesInRad.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_initialJointValuesInRad.zero();
-//        m_desiredJointInRad.resize(static_cast<unsigned int>(m_controlledJoints.size()));
-//        m_desiredJointInRad.zero();
 
         m_configured = true;
         return true;
@@ -357,8 +281,6 @@ class ControlledJointsSources : public JointsSources {
     std::vector<yarp::dev::Pid> m_allJointsPIDs;
     unsigned int m_size;
     bool m_configured;
-
-protected:
 
     friend class WalkingControllers::RobotComponent;
     ControlledJointsSources()
@@ -549,8 +471,323 @@ public:
         return true;
     }
 };
-
 ControlledJointsSources::~ControlledJointsSources(){}
+
+class SelectedJointsSinks : public JointsSinks {
+
+    yarp::dev::PolyDriver* m_robotDriver;
+    yarp::dev::IEncodersTimed* m_encodersInterface;
+    yarp::dev::IPidControl* m_pidInterface;
+    yarp::dev::IRemoteVariables* m_remoteVariablesInterface;
+    yarp::dev::IPositionDirect* m_positionDirectInterface;
+    yarp::dev::IPositionControl* m_positionInterface;
+    yarp::dev::IVelocityControl* m_velocityInterface;
+    yarp::dev::IControlMode* m_controlModeInterface;
+
+    std::vector<std::string> m_jointList;
+    std::vector<int> m_selectedAxis;
+    yarp::os::Bottle m_jointStructure;
+
+    yarp::sig::Vector m_encodersBuffer;
+    iDynTree::VectorDynSize m_toDegBuffer;
+
+    bool m_configured;
+
+    friend class WalkingControllers::RobotComponent;
+    SelectedJointsSinks()
+        : m_robotDriver(nullptr)
+        , m_configured(false)
+    {}
+
+    bool configure(yarp::dev::PolyDriver* robotDriver,
+                   const yarp::os::Bottle &jointsStructure,
+                   const std::vector<std::string> &jointsList,
+                   const std::vector<std::string> &controlledJoints = std::vector<std::string>()) {
+
+        if (m_configured) {
+            yError() << "[SelectedJointsSinks::configure] Cannot configure twice.";
+            return false;
+        }
+
+        if (!robotDriver) {
+            yError() << "[SelectedJointsSinks::configure] Empty robotDriver pointer.";
+            return false;
+        }
+
+        m_robotDriver = robotDriver;
+
+        m_jointStructure = jointsStructure;
+
+        if (!m_robotDriver->view(m_positionInterface) || !m_positionInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IPositionControl interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_encodersInterface) || !m_encodersInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure]Cannot obtain IEncoders interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_positionDirectInterface) || !m_positionDirectInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IPositionDirect interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_velocityInterface) || !m_velocityInterface) {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IVelocity interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_controlModeInterface) || !m_controlModeInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IControlMode interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_pidInterface) || !m_pidInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IPidControl interface";
+            return false;
+        }
+
+        if (!m_robotDriver->view(m_remoteVariablesInterface) || !m_remoteVariablesInterface)
+        {
+            yError() << "[SelectedJointsSinks::configure] Cannot obtain IRemoteVariables interface";
+            return false;
+        }
+
+        m_selectedAxis.clear();
+
+        m_jointList = jointsList;
+
+        if (controlledJoints.size() > 0) {
+
+            std::vector<std::string>::const_iterator jointsListIterator;
+
+            for (size_t j = 0; j < controlledJoints.size(); ++j) {
+
+                jointsListIterator = std::find(m_jointList.begin(), m_jointList.end(), controlledJoints[j]);
+
+                if (jointsListIterator == m_jointList.end()) {
+                    yError() << "[SelectedJointsSinks::configure] Unable to find a joint named " << controlledJoints[j] << ".";
+                    return false;
+                }
+
+                m_selectedAxis.push_back(static_cast<int>(jointsListIterator - m_jointList.begin()));
+            }
+        } else {
+            for (size_t i = 0; i < m_jointList.size(); ++i) {
+                m_selectedAxis.push_back(static_cast<int>(i));
+            }
+        }
+
+        //here I need to resize and initialize some buffers
+        m_encodersBuffer.resize(m_jointList.size());
+        m_toDegBuffer.resize(m_selectedAxis.size());
+
+        m_configured = true;
+
+        return true;
+    }
+
+    bool verifyReachedPosition(const iDynTree::VectorDynSize& desiredPositionsRAD, std::pair<int, double>& worst) {
+
+        if(!m_encodersInterface->getEncoders(m_encodersBuffer.data())){
+            yError() << "[SelectedJointsSinks::verifyReachedPosition] Error reading encoders.";
+            return false;
+        }
+        worst.first = -1;
+        worst.second = 0.0;
+
+        double positionDeg, currentPosDeg, positionErr;
+        for (unsigned j = 0; j < m_selectedAxis.size(); ++j) {
+            positionDeg = iDynTree::rad2deg(desiredPositionsRAD(j));
+            currentPosDeg = m_encodersBuffer[static_cast<size_t>(m_selectedAxis[j])];
+            positionErr = std::abs(positionDeg - currentPosDeg);
+            if (positionErr >= worst.second) {
+                worst.first = m_selectedAxis[j];
+                worst.second = positionErr;
+            }
+        }
+
+        return true;
+    }
+
+
+public:
+
+    ~SelectedJointsSinks() override;
+
+    virtual bool setControlMode(const WalkingControllers::ControlModes &controlMode) override {
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setControlMode] Not configured yet.";
+            return false;
+        }
+
+        if (controlMode == WalkingControllers::ControlModes::Position) {
+            std::vector<int> controlModes(m_selectedAxis.size(), VOCAB_CM_POSITION);
+            if (!m_controlModeInterface->setControlModes(static_cast<int>(m_selectedAxis.size()),m_selectedAxis.data(), controlModes.data())) {
+                yError() << " [SelectedJointsSinks::setControlMode] Error while setting position mode.";
+                return false;
+            }
+        } else if (controlMode == WalkingControllers::ControlModes::PositionDirect) {
+            std::vector<int> controlModes(m_selectedAxis.size(), VOCAB_CM_POSITION_DIRECT);
+            if (!m_controlModeInterface->setControlModes(static_cast<int>(m_selectedAxis.size()),m_selectedAxis.data(), controlModes.data())) {
+                yError() << " [SelectedJointsSinks::setControlMode] Error while setting position direct mode.";
+                return false;
+            }
+        } else if (controlMode == WalkingControllers::ControlModes::Velocity) {
+            std::vector<int> controlModes(m_selectedAxis.size(), VOCAB_CM_VELOCITY);
+            if (!m_controlModeInterface->setControlModes(static_cast<int>(m_selectedAxis.size()),m_selectedAxis.data(), controlModes.data())) {
+                yError() << " [SelectedJointsSinks::setControlMode] Error while setting velocity mode.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    virtual bool setPositionReference(const iDynTree::VectorDynSize& jointsPositionsInRad, double positioningTimeInSec = 5.0) override {
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setPositionReference] Not configured yet.";
+            return false;
+        }
+
+        if (jointsPositionsInRad.size() != m_selectedAxis.size()) {
+            yError() << "[SelectedJointsSinks::setPositionReference] Dimension mismatch between jointsPositionsInRad and the selected axis.";
+            return false;
+        }
+
+        std::pair<int, double> worst(-1, 0.0);
+
+        if (!verifyReachedPosition(jointsPositionsInRad, worst))
+            return false;
+
+        if (worst.second < 2.0) {
+            return true;
+        }
+
+        if (positioningTimeInSec < 0.01) {
+            yError() << "[SelectedJointsSinks::setPositionReference] The positioning time is too short.";
+            return false;
+        }
+
+//        if (!setControlMode(WalkingControllers::ControlModes::Position)) {
+//            yError()<<"[SelectedJointsSinks::setPositionReference] Failed in setting POSITION mode.";
+//            return false;
+//        }
+
+        double positionDeg, positionErr;
+
+        if (!m_encodersInterface->getEncoders(m_encodersBuffer.data())) {
+            yError() << "[SelectedJointsSinks::setPositionReference] Error while reading encoders.";
+            return false;
+        }
+        worst.first = -1;
+        worst.second = 0.0;
+        std::vector<double> refSpeeds(m_selectedAxis.size());
+
+        for (unsigned j = 0; j < m_selectedAxis.size(); ++j) {
+            positionDeg = iDynTree::rad2deg(jointsPositionsInRad(j));
+
+            positionErr = std::abs(positionDeg - m_encodersBuffer[static_cast<size_t>(m_selectedAxis[j])]);
+            refSpeeds[j] = std::max(3.0, positionErr/positioningTimeInSec);
+        }
+
+        if (!m_positionInterface->setRefSpeeds(static_cast<int>(m_selectedAxis.size()), m_selectedAxis.data(), refSpeeds.data())) {
+            yError() << "[SelectedJointsSinks::setPositionReference] Error while setting the desired speed of joints.";
+            return false;
+        }
+
+        iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(jointsPositionsInRad) * iDynTree::rad2deg(1);
+
+        if (!m_positionInterface->positionMove(static_cast<int>(m_selectedAxis.size()), m_selectedAxis.data(), m_toDegBuffer.data())) {
+            yError() << "Error while setting the desired positions.";
+            return false;
+        }
+
+        refSpeeds.assign(m_selectedAxis.size(), 5.0);
+        if (!m_positionInterface->setRefSpeeds(static_cast<int>(m_selectedAxis.size()), m_selectedAxis.data(), refSpeeds.data())) {
+            yError() << "Error while setting the desired speed of joints.";
+            return false;
+        }
+
+        bool terminated = false;
+        int attempt = 0;
+        do {
+            if (!terminated) {
+                m_positionInterface->checkMotionDone(&terminated);
+            }
+
+            if (terminated){
+                if (!verifyReachedPosition(jointsPositionsInRad, worst))
+                    return false;
+
+                if (worst.second < 2.0) {
+                    return true;
+                }
+            }
+
+            yarp::os::Time::delay(positioningTimeInSec * 0.5);
+            attempt++;
+        } while(attempt < 4);
+
+        if (terminated) {
+            yError() << "The joint " << m_jointList[static_cast<size_t>(worst.first)] << " was the worst in positioning with an error of " << worst.second << "[deg].";
+        } else {
+            yError() << "Unable to complete the motion.";
+        }
+
+        return false;
+    }
+
+    virtual bool setDirectPositionReference(const iDynTree::VectorDynSize& jointsPositionsInRad) override {
+
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setDirectPositionReference] Not configured yet.";
+            return false;
+        }
+
+        if (jointsPositionsInRad.size() != m_selectedAxis.size()) {
+            yError() << "[SelectedJointsSinks::setDirectPositionReference] Dimension mismatch between desired position vector and the number of controlled joints.";
+            return false;
+        }
+
+        if(!m_encodersInterface->getEncoders(m_encodersBuffer.data())){
+            yError() << "[SelectedJointsSinks::setDirectPositionReference] Error reading encoders.";
+            return false;
+        }
+
+        iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(jointsPositionsInRad) * iDynTree::rad2deg(1);
+
+        for (unsigned j = 0; j < m_selectedAxis.size(); ++j) {
+
+            if (std::abs(m_toDegBuffer(j) - m_encodersBuffer[static_cast<size_t>(m_selectedAxis[j])]) > 15.0){
+                yError() << "[SelectedJointsSinks::setDirectPositionReference] The distance between the current and the desired position of joint "
+                         << m_jointList[static_cast<size_t>(m_selectedAxis[j])] << " is greater than 15.0 degrees.";
+                return false;
+            }
+        }
+
+        if (!m_positionDirectInterface->setPositions(static_cast<int>(m_selectedAxis.size()), m_selectedAxis.data(), m_toDegBuffer.data())){
+            yError() << "[SelectedJointsSinks::setDirectPositionReference] Error while setting the desired position.";
+            return false;
+        }
+
+        return true;
+    }
+
+    virtual bool setVelocityReference(const iDynTree::VectorDynSize& jointsVelInRadPerSec) override {}
+
+    virtual bool setPositionPIDs(const std::vector<yarp::dev::Pid>& positionPIDs) override {}
+
+    virtual bool setPositionPIDsSmoothingTimes(const iDynTree::VectorDynSize& smoothingTimesInSec) override {}
+
+};
+SelectedJointsSinks::~SelectedJointsSinks(){}
 
 class RobotComponent::RobotComponentImplementation {
 public:
@@ -560,6 +797,7 @@ public:
     yarp::os::Bottle jointsStructure;
     std::shared_ptr<AllJointsSources> allJointsSources_ptr;
     std::shared_ptr<ControlledJointsSources> controlledJointsSources_ptr;
+    std::shared_ptr<SelectedJointsSinks> allJointsSinks_ptr, controlledJointsSinks_ptr;
 };
 
 RobotComponent::RobotComponent()
@@ -569,10 +807,22 @@ RobotComponent::RobotComponent()
 
     m_pimpl->allJointsSources_ptr.reset(new AllJointsSources());
     m_pimpl->controlledJointsSources_ptr.reset(new ControlledJointsSources());
+    m_pimpl->allJointsSinks_ptr.reset(new SelectedJointsSinks());
+    m_pimpl->controlledJointsSinks_ptr.reset(new SelectedJointsSinks());
 }
 
 RobotComponent::~RobotComponent()
 {
+    if (m_pimpl->robotDriver) {
+        if (!(m_pimpl->controlledJointsSinks_ptr->setControlMode(WalkingControllers::ControlModes::Position))) {
+            yError() << "[RobotComponent::~RobotComponent] Failed in setting POSITION mode.";
+        }
+
+        m_pimpl->robotDriver->close();
+        delete m_pimpl->robotDriver;
+        m_pimpl->robotDriver = nullptr;
+    }
+
     if (m_pimpl) {
         delete m_pimpl;
         m_pimpl = nullptr;
