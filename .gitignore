@@ -4,3 +4,6 @@ build/*
 # emacs
 *~
 \#*\#
+
+# QtCreator
+*.user
