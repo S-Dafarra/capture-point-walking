@@ -103,6 +103,7 @@ class AllJointsSources : public JointsSources {
             return false;
         }
 
+        m_allJoints.clear();
         m_allJoints.reserve(static_cast<size_t>(axes));
         // read all the joint names
         for (int i = 0; i < axes; ++i) {
@@ -489,7 +490,7 @@ class SelectedJointsSinks : public JointsSinks {
     yarp::os::Bottle m_jointStructure;
 
     yarp::sig::Vector m_encodersBuffer;
-    iDynTree::VectorDynSize m_toDegBuffer;
+    iDynTree::VectorDynSize m_toDegBuffer, m_allJointsSmoothingTime;
 
     bool m_configured;
 
@@ -586,7 +587,8 @@ class SelectedJointsSinks : public JointsSinks {
 
         //here I need to resize and initialize some buffers
         m_encodersBuffer.resize(m_jointList.size());
-        m_toDegBuffer.resize(m_selectedAxis.size());
+        m_allJointsSmoothingTime.resize(static_cast<unsigned int>(m_jointList.size()));
+        m_toDegBuffer.resize(static_cast<unsigned int>(m_selectedAxis.size()));
 
         m_configured = true;
 
@@ -733,7 +735,7 @@ public:
 
             yarp::os::Time::delay(positioningTimeInSec * 0.5);
             attempt++;
-        } while(attempt < 4);
+        } while (attempt < 4);
 
         if (terminated) {
             yError() << "The joint " << m_jointList[static_cast<size_t>(worst.first)] << " was the worst in positioning with an error of " << worst.second << "[deg].";
@@ -756,7 +758,7 @@ public:
             return false;
         }
 
-        if(!m_encodersInterface->getEncoders(m_encodersBuffer.data())){
+        if (!m_encodersInterface->getEncoders(m_encodersBuffer.data())){
             yError() << "[SelectedJointsSinks::setDirectPositionReference] Error reading encoders.";
             return false;
         }
@@ -780,11 +782,110 @@ public:
         return true;
     }
 
-    virtual bool setVelocityReference(const iDynTree::VectorDynSize& jointsVelInRadPerSec) override {}
+    virtual bool setVelocityReference(const iDynTree::VectorDynSize& jointsVelInRadPerSec) override {
 
-    virtual bool setPositionPIDs(const std::vector<yarp::dev::Pid>& positionPIDs) override {}
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setVelocityReference] Not configured yet.";
+            return false;
+        }
 
-    virtual bool setPositionPIDsSmoothingTimes(const iDynTree::VectorDynSize& smoothingTimesInSec) override {}
+        if (jointsVelInRadPerSec.size() != m_selectedAxis.size()) {
+            yError() << "[SelectedJointsSinks::setVelocityReference] Dimension mismatch between desired velocity "
+                     << "vector and the number of selected joints.";
+            return false;
+        }
+
+        if ((iDynTree::toEigen(jointsVelInRadPerSec).minCoeff() < -iDynTree::deg2rad(30)) ||
+           (iDynTree::toEigen(jointsVelInRadPerSec).maxCoeff() > iDynTree::deg2rad(30))) {
+            yError() << "[SelectedJointsSinks::setVelocityReference] The absolute value of the desired velocity is higher than 30 deg/s.";
+            return false;
+        }
+
+        iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(jointsVelInRadPerSec) * iDynTree::rad2deg(1);
+
+        if (!m_velocityInterface->velocityMove(static_cast<int>(m_selectedAxis.size()), m_selectedAxis.data(), m_toDegBuffer.data()))
+        {
+            yError() << "[SelectedJointsSinks::setVelocityReference] Error while setting the desired velocity.";
+            return false;
+        }
+
+        return true;
+    }
+
+    virtual bool setPositionPIDs(const std::vector<yarp::dev::Pid>& positionPIDs) override {
+
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setPositionPIDs] Not configured yet.";
+            return false;
+        }
+
+        if (positionPIDs.size() != m_selectedAxis.size()) {
+            yError() << "[SelectedJointsSinks::setPositionPIDs] The number of desired PIDs should match the number of selected joints.";
+            return false;
+        }
+
+        for (size_t j = 0; j < m_selectedAxis.size(); ++j) {
+            if (!m_pidInterface->setPid(yarp::dev::VOCAB_PIDTYPE_POSITION, m_selectedAxis[j], positionPIDs[j])) {
+                yError() << "[SelectedJointsSinks::setPositionPIDs] Error while setting the desired position PID on "
+                         << m_jointList[static_cast<size_t>(m_selectedAxis[j])] << " axis.";
+                return false;
+            }
+        }
+        return true;
+    }
+
+    virtual bool setPositionPIDsSmoothingTimes(const iDynTree::VectorDynSize& smoothingTimesInSec) override {
+
+        if (!m_configured) {
+            yError() << "[SelectedJointsSinks::setPositionPIDsSmoothingTimes] Not configured yet.";
+            return false;
+        }
+
+        if (smoothingTimesInSec.size() != m_selectedAxis.size()) {
+            yError() << "[SelectedJointsSinks::setPositionPIDsSmoothingTimes] The number of desired smoothing times should match the number of selected joints.";
+            return false;
+        }
+
+        yarp::os::Bottle input, output;
+
+        if (!(m_remoteVariablesInterface->getRemoteVariable("posPidSlopeTime", input))) {
+            yError() << "[SelectedJointsSinks::setPositionPIDsSmoothingTimes] Failed to get the current posPidSlope remote variable.";
+            return false;
+        }
+
+        if (input.size() != m_allJointsSmoothingTime.size()) {
+            yError() << "[SelectedJointsSinks::setPositionPIDsSmoothingTimes] The bottle size is different from the joints number.";
+            return false;
+        }
+
+        for (unsigned int j = 0; j < m_allJointsSmoothingTime.size(); ++j) {
+            m_allJointsSmoothingTime(j) = input.get(j).asDouble();
+        }
+
+        for (size_t j = 0; j < m_selectedAxis.size(); ++j) {
+            m_allJointsSmoothingTime(static_cast<unsigned int>(m_selectedAxis[j])) = smoothingTimesInSec(static_cast<unsigned int>(j));
+        }
+
+        unsigned int jointIndex = 0;
+        for (size_t b = 0; b < m_jointStructure.size(); ++b) {
+            yarp::os::Bottle &innerList = output.addList();
+
+            for (size_t j = 0; j < m_jointStructure.get(b).asList()->size(); ++j) {
+                assert(jointIndex < m_allJointsSmoothingTime.size());
+                innerList.addDouble(m_allJointsSmoothingTime(jointIndex));
+                ++jointIndex;
+            }
+        }
+
+        assert(jointIndex == m_allJointsSmoothingTime.size());
+
+        if (!(m_remoteVariablesInterface->setRemoteVariable("posPidSlopeTime", output))) {
+            yError() << "[SelectedJointsSinks::setPositionPIDsSmoothingTimes] Failed to set the desired posPidSlope remote variable.";
+            return false;
+        }
+
+        return true;
+    }
 
 };
 SelectedJointsSinks::~SelectedJointsSinks(){}
@@ -794,7 +895,6 @@ public:
     yarp::dev::PolyDriver* robotDriver;
     yarp::os::Bottle remoteControlBoards;
     std::string robotName;
-    yarp::os::Bottle jointsStructure;
     std::shared_ptr<AllJointsSources> allJointsSources_ptr;
     std::shared_ptr<ControlledJointsSources> controlledJointsSources_ptr;
     std::shared_ptr<SelectedJointsSinks> allJointsSinks_ptr, controlledJointsSinks_ptr;
@@ -829,30 +929,24 @@ RobotComponent::~RobotComponent()
     }
 }
 
-bool RobotComponent::configure(const yarp::os::Searchable &rf, const iDynTree::Model URDFmodel, const std::vector<std::string> &controlledJoints)
+bool RobotComponent::configure(const std::string& robotName, const yarp::os::Value &remoteControlBoards,
+                               iDynTree::Model& URDFmodel, const std::vector<std::string> &controlledJoints)
 {
+    m_pimpl->robotName = robotName;
+
     std::string errorSign = "[RobotComponent::configure]";
     //yarp::os::Bottle remoteControlBoards;
     m_pimpl->remoteControlBoards.clear();
     yarp::os::Bottle &remoteControlBoardsList = m_pimpl->remoteControlBoards.addList();
-    yarp::os::Value* inputControlBoards;
 
-    m_pimpl->robotName = rf.check("robot", yarp::os::Value("icubSim")).asString();
-
-    if (!YarpHelper::getStringFromSearchable(rf, "robot", m_pimpl->robotName)) {
-        return false;
-    }
-
-
-    if (rf.check("remoteControlBoards", inputControlBoards)){
-        yarp::os::Bottle *devicesList = inputControlBoards->asList();
-        for (size_t dev = 0; dev < devicesList->size(); ++dev) {
-            if(devicesList->get(dev).isString()){
-                remoteControlBoardsList.addString("/" + m_pimpl->robotName + "/" + devicesList->get(dev).asString());
-            }
+    yarp::os::Bottle *devicesList = remoteControlBoards.asList();
+    for (size_t dev = 0; dev < devicesList->size(); ++dev) {
+        if(devicesList->get(dev).isString()){
+            remoteControlBoardsList.addString("/" + m_pimpl->robotName + "/" + devicesList->get(dev).asString());
+        } else {
+            yError() << errorSign << "Unrecognized element in the remoteControlBoards list: " << devicesList->get(dev).toString() << ".";
+            return false;
         }
-    } else {
-        remoteControlBoardsList.addString("/" + m_pimpl->robotName + "/all_joints");
     }
 
     yarp::os::Bottle allAxis;
@@ -869,7 +963,8 @@ bool RobotComponent::configure(const yarp::os::Searchable &rf, const iDynTree::M
     int tempAxesNum = 0;
     std::string tempString;
 
-    m_pimpl->jointsStructure.clear();
+    yarp::os::Bottle jointsStructure;
+    std::vector<std::string> jointList;
 
     for (size_t rcb = 0; rcb < remoteControlBoardsList.size(); ++rcb) {
         tempOptions.put("remote", remoteControlBoardsList.get(rcb));
@@ -888,7 +983,7 @@ bool RobotComponent::configure(const yarp::os::Searchable &rf, const iDynTree::M
             return false;
         }
 
-        yarp::os::Bottle subList = m_pimpl->jointsStructure.addList();
+        yarp::os::Bottle &subList = jointsStructure.addList();
 
         if (!tempEncoders->getAxes(&tempAxesNum) || tempAxesNum <= 0) {
             yError() << errorSign << "No axes found in controlboard "<< remoteControlBoardsList.get(rcb).asString();
@@ -903,6 +998,7 @@ bool RobotComponent::configure(const yarp::os::Searchable &rf, const iDynTree::M
                 }
                 if (URDFmodel.getJointIndex(tempString) != iDynTree::JOINT_INVALID_INDEX){
                     allAxisList.addString(tempString);
+                    jointList.push_back(tempString);
                     subList.addDouble(0.0);
                 } else {
                     yWarning() << errorSign << "Joint " << tempString << " not found in the URDF model.";
@@ -943,6 +1039,16 @@ bool RobotComponent::configure(const yarp::os::Searchable &rf, const iDynTree::M
         return false;
     }
 
+    if (!(m_pimpl->allJointsSinks_ptr->configure(m_pimpl->robotDriver, jointsStructure, jointList))) {
+        yError() << errorSign << "Error while configuring the allJointsSinks object.";
+        return false;
+    }
+
+    if (!(m_pimpl->controlledJointsSinks_ptr->configure(m_pimpl->robotDriver, jointsStructure, jointList, controlledJoints))) {
+        yError() << errorSign << "Error while configuring the controlledJointsSinks object.";
+        return false;
+    }
+
     return true;
 }
 
@@ -954,4 +1060,14 @@ JointsSources &RobotComponent::allJointsSources()
 JointsSources &RobotComponent::controlledJointsSources()
 {
     return *(m_pimpl->controlledJointsSources_ptr);
+}
+
+JointsSinks &RobotComponent::allJointsSinks()
+{
+    return *(m_pimpl->allJointsSinks_ptr);
+}
+
+JointsSinks &RobotComponent::controlledJointsSinks()
+{
+    return *(m_pimpl->controlledJointsSinks_ptr);
 }

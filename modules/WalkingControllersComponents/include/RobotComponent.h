@@ -9,7 +9,7 @@
 #ifndef ROBOTCOMPONENT_H
 #define ROBOTCOMPONENT_H
 
-#include <yarp/os/Searchable.h>
+#include <yarp/os/Value.h>
 #include <iDynTree/Model/Model.h>
 #include <vector>
 #include <string>
@@ -33,7 +33,8 @@ public:
 
     ~RobotComponent();
 
-    bool configure(const yarp::os::Searchable& rf, const iDynTree::Model URDFmodel, const std::vector<std::string>& controlledJoints);
+    bool configure(const std::string& robotName, const yarp::os::Value &remoteControlBoards,
+                   iDynTree::Model& URDFmodel, const std::vector<std::string> &controlledJoints);
 
     JointsSources &allJointsSources(); //order equal to the one in the defined model
 
