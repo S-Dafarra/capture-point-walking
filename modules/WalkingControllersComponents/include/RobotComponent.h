@@ -36,9 +36,9 @@ public:
     bool configure(const std::string& robotName, const yarp::os::Value &remoteControlBoards,
                    iDynTree::Model& URDFmodel, const std::vector<std::string> &controlledJoints);
 
-    JointsSources &allJointsSources(); //order equal to the one in the defined model
+    JointsSources &allJointsSources(); //order depending on the controlBoards order (only for the joints available in the URDFmodel)
 
-    JointsSources &controlledJointsSources(); //order equal to the one in the defined model
+    JointsSources &controlledJointsSources(); //order equal to the one in controlledJoints
 
     JointsSinks &allJointsSinks();
 
