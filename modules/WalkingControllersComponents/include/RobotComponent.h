@@ -11,13 +11,12 @@
 
 #include <yarp/os/Value.h>
 #include <iDynTree/Model/Model.h>
+#include <JointsSources.h>
+#include <JointsSinks.h>
 #include <vector>
 #include <string>
 
 namespace WalkingControllers {
-    class JointsSources;
-
-    class JointsSinks;
 
     class RobotComponent;
 }

@@ -35,6 +35,12 @@
 
 using namespace WalkingControllers;
 
+//**********************************************************
+//**********************************************************
+//AllJointsSources Implementation
+//**********************************************************
+//**********************************************************
+
 class AllJointsSources : public JointsSources {
 
     yarp::dev::PolyDriver* m_robotDriver;
@@ -263,7 +269,7 @@ public:
         unsigned int index;
         for (size_t j = 0; j < m_allJoints.size(); ++j) {
             index = static_cast<unsigned int>(j);
-            smoothingTimesInSec(index) = input.get(j).asDouble();
+            smoothingTimesInSec(index) = input.get(j).asInt()/1000.0;
         }
 
         return true;
@@ -271,6 +277,13 @@ public:
 
 };
 AllJointsSources::~AllJointsSources(){}
+
+//**********************************************************
+//**********************************************************
+//ControlledJointsSources Implementation
+//**********************************************************
+//**********************************************************
+
 
 class ControlledJointsSources : public JointsSources {
 
@@ -474,6 +487,12 @@ public:
 };
 ControlledJointsSources::~ControlledJointsSources(){}
 
+//**********************************************************
+//**********************************************************
+//SelectedJointsSinks Implementation
+//**********************************************************
+//**********************************************************
+
 class SelectedJointsSinks : public JointsSinks {
 
     yarp::dev::PolyDriver* m_robotDriver;
@@ -491,6 +510,7 @@ class SelectedJointsSinks : public JointsSinks {
 
     yarp::sig::Vector m_encodersBuffer;
     iDynTree::VectorDynSize m_toDegBuffer, m_allJointsSmoothingTime;
+    std::vector<yarp::dev::Pid> m_previousPIDs;
 
     bool m_configured;
 
@@ -564,6 +584,10 @@ class SelectedJointsSinks : public JointsSinks {
 
         m_jointList = jointsList;
 
+        m_previousPIDs.clear();
+
+        yarp::dev::Pid defaultPid;
+
         if (controlledJoints.size() > 0) {
 
             std::vector<std::string>::const_iterator jointsListIterator;
@@ -577,7 +601,14 @@ class SelectedJointsSinks : public JointsSinks {
                     return false;
                 }
 
-                m_selectedAxis.push_back(static_cast<int>(jointsListIterator - m_jointList.begin()));
+                long index = jointsListIterator - m_jointList.begin();
+                m_selectedAxis.push_back(static_cast<int>(index));
+
+                if (!(m_pidInterface->getPid(yarp::dev::VOCAB_PIDTYPE_POSITION, static_cast<int>(index), &defaultPid))) {
+                    yError() << "[SelectedJointsSinks::configure] Unable to get default PID for joint named " << controlledJoints[j] << ".";
+                    return false;
+                }
+                m_previousPIDs.push_back(defaultPid);
             }
         } else {
             for (size_t i = 0; i < m_jointList.size(); ++i) {
@@ -824,11 +855,17 @@ public:
             return false;
         }
 
+        yarp::dev::Pid newPid;
+
         for (size_t j = 0; j < m_selectedAxis.size(); ++j) {
-            if (!m_pidInterface->setPid(yarp::dev::VOCAB_PIDTYPE_POSITION, m_selectedAxis[j], positionPIDs[j])) {
-                yError() << "[SelectedJointsSinks::setPositionPIDs] Error while setting the desired position PID on "
-                         << m_jointList[static_cast<size_t>(m_selectedAxis[j])] << " axis.";
-                return false;
+            newPid = positionPIDs[j];
+            if (!(newPid == m_previousPIDs[j])) {
+                if (!m_pidInterface->setPid(yarp::dev::VOCAB_PIDTYPE_POSITION, m_selectedAxis[j], newPid)) {
+                    yError() << "[SelectedJointsSinks::setPositionPIDs] Error while setting the desired position PID on "
+                             << m_jointList[static_cast<size_t>(m_selectedAxis[j])] << " axis.";
+                    return false;
+                }
+                m_previousPIDs[j] = newPid;
             }
         }
         return true;
@@ -867,12 +904,14 @@ public:
         }
 
         unsigned int jointIndex = 0;
+        int smoothingTimeInMs;
         for (size_t b = 0; b < m_jointStructure.size(); ++b) {
             yarp::os::Bottle &innerList = output.addList();
 
             for (size_t j = 0; j < m_jointStructure.get(b).asList()->size(); ++j) {
                 assert(jointIndex < m_allJointsSmoothingTime.size());
-                innerList.addDouble(m_allJointsSmoothingTime(jointIndex));
+                smoothingTimeInMs = static_cast<int>(std::round(m_allJointsSmoothingTime(jointIndex) * 1000));
+                innerList.addInt(smoothingTimeInMs);
                 ++jointIndex;
             }
         }
@@ -890,6 +929,12 @@ public:
 };
 SelectedJointsSinks::~SelectedJointsSinks(){}
 
+//**********************************************************
+//**********************************************************
+//RobotComponent Pimpl
+//**********************************************************
+//**********************************************************
+
 class RobotComponent::RobotComponentImplementation {
 public:
     yarp::dev::PolyDriver* robotDriver;
@@ -899,6 +944,12 @@ public:
     std::shared_ptr<ControlledJointsSources> controlledJointsSources_ptr;
     std::shared_ptr<SelectedJointsSinks> allJointsSinks_ptr, controlledJointsSinks_ptr;
 };
+
+//**********************************************************
+//**********************************************************
+//RobotComponent Implementation
+//**********************************************************
+//**********************************************************
 
 RobotComponent::RobotComponent()
     :m_pimpl(new RobotComponentImplementation())
