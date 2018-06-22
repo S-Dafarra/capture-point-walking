@@ -19,6 +19,8 @@
 #include <sstream>
 #include <cmath>
 
+using namespace WalkingControllers;
+
 WalkingPIDHandler::WalkingPIDHandler()
     : m_useGainScheduling(false)
     , m_phaseInitTime(0.0)

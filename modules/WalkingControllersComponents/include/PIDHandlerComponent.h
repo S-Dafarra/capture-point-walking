@@ -22,18 +22,28 @@
 #include <thread>
 #include <condition_variable>
 
-typedef std::map<std::string, size_t> AxisMap;
+namespace WalkingControllers {
 
-typedef std::map<std::string, yarp::dev::Pid> PIDmap;
+    typedef std::map<std::string, size_t> AxisMap;
 
-enum class PIDPhase {
-    Default,
+    typedef std::map<std::string, yarp::dev::Pid> PIDmap;
+
+    enum class PIDPhase {
+        Default,
         SwingLeft,
         SwingRight,
         Switch
-        };
+    };
 
-class PIDSchedulingObject {
+    class PIDSchedulingObject;
+
+    class WalkingPIDHandler;
+
+}
+
+
+
+class WalkingControllers::PIDSchedulingObject {
 
     std::string m_name;
     PIDmap m_desiredPIDs;
@@ -59,7 +69,7 @@ public:
 
 };
 
-class WalkingPIDHandler {
+class WalkingControllers::WalkingPIDHandler {
 
     std::shared_ptr<WalkingControllers::RobotComponent> m_robotComponent;
     bool m_useGainScheduling;
