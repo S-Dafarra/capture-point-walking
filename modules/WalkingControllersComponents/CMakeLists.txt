@@ -12,13 +12,15 @@ set(COMPONENTS_HDR include/RobotComponent.h
                    include/JointsSinks.h
                    include/Utils.h
                    include/Utils.tpp
-                   include/PIDHandlerComponent.h)
+                   include/PIDHandlerComponent.h
+                   include/NonLinearIKComponent.h)
 
 set(COMPONENTS_SRC src/RobotComponent.cpp
                    src/JointsSources.cpp
                    src/JointsSinks.cpp
                    src/Utils.cpp
-                   src/PIDHandlerComponent.cpp)
+                   src/PIDHandlerComponent.cpp
+                   src/NonLinearIKComponent.cpp)
 
 add_library(${libraryname} ${COMPONENTS_HDR} ${COMPONENTS_SRC})
 target_include_directories(${libraryname} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
