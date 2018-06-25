@@ -22,9 +22,11 @@
 #include <yarp/os/Bottle.h>
 #include <yarp/os/LogStream.h>
 #include <yarp/dev/IRemoteVariables.h>
+#include <yarp/os/ResourceFinder.h>
 
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/ModelIO/ModelLoader.h>
 #include <Eigen/Dense>
 
 #include <memory>
@@ -943,6 +945,7 @@ public:
     std::shared_ptr<AllJointsSources> allJointsSources_ptr;
     std::shared_ptr<ControlledJointsSources> controlledJointsSources_ptr;
     std::shared_ptr<SelectedJointsSinks> allJointsSinks_ptr, controlledJointsSinks_ptr;
+    iDynTree::Model model;
 };
 
 //**********************************************************
@@ -980,13 +983,42 @@ RobotComponent::~RobotComponent()
     }
 }
 
-bool RobotComponent::configure(const std::string& robotName, const yarp::os::Value &remoteControlBoards,
-                               iDynTree::Model& URDFmodel, const std::vector<std::string> &controlledJoints)
+bool RobotComponent::configure(const yarp::os::Searchable &robotComponentSettings)
 {
-    m_pimpl->robotName = robotName;
-
     std::string errorSign = "[RobotComponent::configure]";
-    //yarp::os::Bottle remoteControlBoards;
+
+    if (!(YarpHelper::getStringFromSearchable(robotComponentSettings, "robot", m_pimpl->robotName))) {
+        return false;
+    }
+
+    std::string modelFile;
+
+    if (!(YarpHelper::getStringFromSearchable(robotComponentSettings, "model", modelFile))) {
+        return false;
+    }
+
+    std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(modelFile);
+
+    iDynTree::ModelLoader loader;
+
+    if (!loader.loadModelFromFile(pathToModel)) {
+        yError() << errorSign <<"Unable to load model " << modelFile << ".";
+        return false;
+    }
+
+    if (!loader.isValid()) {
+        yError() << errorSign << modelFile <<" is not valid.";
+        return false;
+    }
+
+    m_pimpl->model = loader.model();
+
+    yarp::os::Value remoteControlBoards = robotComponentSettings.find("remoteControlBoards");
+    if (remoteControlBoards.isNull()) {
+        yError() << errorSign << "remoteControlBoards entry not defined in the robotComponentSettings.";
+        return false;
+    }
+
     m_pimpl->remoteControlBoards.clear();
     yarp::os::Bottle &remoteControlBoardsList = m_pimpl->remoteControlBoards.addList();
 
@@ -1047,7 +1079,7 @@ bool RobotComponent::configure(const std::string& robotName, const yarp::os::Val
                                 "Failed in getting the name of axis "<< ax << " in control board " << remoteControlBoardsList.get(rcb).asString();
                     return false;
                 }
-                if (URDFmodel.getJointIndex(tempString) != iDynTree::JOINT_INVALID_INDEX){
+                if (m_pimpl->model.getJointIndex(tempString) != iDynTree::JOINT_INVALID_INDEX){
                     allAxisList.addString(tempString);
                     jointList.push_back(tempString);
                     subList.addDouble(0.0);
@@ -1059,6 +1091,10 @@ bool RobotComponent::configure(const std::string& robotName, const yarp::os::Val
         tempDriver.close();
         tempEncoders = nullptr;
         tempAxis = nullptr;
+    }
+
+    if (jointList.size() != m_pimpl->model.getNrOfJoints()) {
+        yWarning() << errorSign << "Some joints defined in the URDF model have not been found in the control boards. Have them all been considered?";
     }
 
     yarp::os::Property deviceOptions;
@@ -1078,6 +1114,26 @@ bool RobotComponent::configure(const std::string& robotName, const yarp::os::Val
     {
         yError() << errorSign << "Problem in opening the robot controlboard";
         return false;
+    }
+
+    yarp::os::Value jointListConfiguration = robotComponentSettings.check("jointList", allAxis.get(0));
+
+    if (!jointListConfiguration.isList() || !jointListConfiguration.asList()){
+        yError() << errorSign << "Unable to read the joint list.";
+        return false;
+    }
+
+    // Translate the axes list Bottle to a vector
+    yarp::os::Bottle *joints = jointListConfiguration.asList();
+    std::vector<std::string> controlledJoints;
+    controlledJoints.reserve(joints->size());
+
+    for (size_t i = 0; i < joints->size(); ++i) {
+        if (joints->get(i).isString()) {
+            controlledJoints.push_back(joints->get(i).asString());
+        } else {
+            yWarning() << errorSign << "Unrecognized joint name "<< joints->get(i).toString();
+        }
     }
 
     if (!(m_pimpl->allJointsSources_ptr->configure(m_pimpl->robotDriver))) {
@@ -1121,4 +1177,9 @@ JointsSinks &RobotComponent::allJointsSinks()
 JointsSinks &RobotComponent::controlledJointsSinks()
 {
     return *(m_pimpl->controlledJointsSinks_ptr);
+}
+
+const iDynTree::Model &RobotComponent::robotModel() const
+{
+    return m_pimpl->model;
 }

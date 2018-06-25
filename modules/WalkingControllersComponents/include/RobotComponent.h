@@ -9,7 +9,7 @@
 #ifndef ROBOTCOMPONENT_H
 #define ROBOTCOMPONENT_H
 
-#include <yarp/os/Value.h>
+#include <yarp/os/Searchable.h>
 #include <iDynTree/Model/Model.h>
 #include <JointsSources.h>
 #include <JointsSinks.h>
@@ -32,8 +32,7 @@ public:
 
     ~RobotComponent();
 
-    bool configure(const std::string& robotName, const yarp::os::Value &remoteControlBoards,
-                   iDynTree::Model& URDFmodel, const std::vector<std::string> &controlledJoints);
+    bool configure(const yarp::os::Searchable& robotComponentSettings);
 
     JointsSources &allJointsSources(); //order depending on the controlBoards order (only for the joints available in the URDFmodel)
 
@@ -42,6 +41,8 @@ public:
     JointsSinks &allJointsSinks();
 
     JointsSinks &controlledJointsSinks();
+
+    const iDynTree::Model &robotModel() const;
 };
 
 #endif // ROBOTCOMPONENT_H

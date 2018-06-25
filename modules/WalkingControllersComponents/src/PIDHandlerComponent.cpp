@@ -94,7 +94,6 @@ bool WalkingPIDHandler::parseDefaultPIDGroup(const yarp::os::Bottle *defaultGrou
         return false;
     }
 
-    m_defaultPID = m_originalPID;
     for (size_t i = 1; i < defaultGroup->size(); ++i){
         yarp::os::Value subgroup = defaultGroup->get(i);
         if (isPIDElement(subgroup)){
@@ -112,12 +111,6 @@ bool WalkingPIDHandler::parseDefaultPIDGroup(const yarp::os::Bottle *defaultGrou
                 yWarning() << "No joint found with the name " << jointName <<". Skipping the insertion of the default PID.";
             }
         }
-    }
-
-    m_defaultPIDsVector.resize(m_axisMap.size());
-
-    for (AxisMap::iterator joint; joint != m_axisMap.end(); ++joint) {
-        m_defaultPIDsVector[joint->second] = m_defaultPID[joint->first];
     }
 
     return true;
@@ -174,7 +167,8 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
         return false;
     }
 
-    bool defaultFound = false;
+    m_defaultPID = m_originalPID;
+
     for (size_t g = 1; g < PIDSettings.size(); ++g){
         if (PIDSettings.get(g).isList()){
             yarp::os::Bottle *group = PIDSettings.get(g).asList();
@@ -184,7 +178,6 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
                 if(!parseDefaultPIDGroup(group))
                     return false;
 
-                defaultFound = true;
             } else if (group->check("activationPhase")){
                 std::string name = group->get(0).toString();
                 yInfo() << "Parsing " << name << " PID group.";
@@ -216,10 +209,13 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
             }
         }
     }
-    if (!defaultFound){
-        yError() << "DEFAULT PID group not found.";
-        return false;
+
+    m_defaultPIDsVector.resize(m_axisMap.size());
+
+    for (AxisMap::iterator joint; joint != m_axisMap.end(); ++joint) {
+        m_defaultPIDsVector[joint->second] = m_defaultPID[joint->first];
     }
+
     return true;
 }
 

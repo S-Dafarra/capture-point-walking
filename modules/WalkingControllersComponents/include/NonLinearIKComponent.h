@@ -89,7 +89,7 @@ public:
      */
     void setVerboseMode(bool verboseMode);
 
-    /*@ Initialize the walking IK
+    /*@ Initialize the IK
      * @param ikOption the options for the IK
      * @param jointList list of joints to be considered for the inverse kinematics
      * @return true on success, false otherwise
@@ -100,7 +100,7 @@ public:
 
     bool updateAdditionalRotation(const iDynTree::Rotation& additionalRotation); //Defined in a inertial frame, with the z pointing upwards
 
-    bool setFullModelFeedBack(const iDynTree::VectorDynSize& feedback); //IMPROVEMENT: We should consider that the tracking of feet trajectory may not be perfect. This may lead the robot to fall since the loop is not closed over the position of the feet.
+    bool setFullModelFeedBack(const iDynTree::VectorDynSize& feedback);
 
     bool setInitialGuess(const iDynTree::VectorDynSize& guess);
 
