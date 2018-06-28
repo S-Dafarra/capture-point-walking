@@ -4,7 +4,7 @@
 
 find_package(iDynTree REQUIRED)
 
-add_subdirectory(Walking_module)
+#add_subdirectory(Walking_module)
 add_subdirectory(WalkingLogger_module)
 add_subdirectory(Joypad_module)
 add_subdirectory(WalkingControllersComponents)
