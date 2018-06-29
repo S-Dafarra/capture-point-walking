@@ -19,7 +19,8 @@ set(COMPONENTS_HDR include/RobotComponent.h
                    include/YarpSigVectorPortSink.h
                    include/UnicycleGeneratorComponent.h
                    include/UnicycleReferenceSource.h
-                   include/UnicycleJoypadSource.h)
+                   include/UnicycleJoypadSource.h
+                   include/UnicyclePortSource.h)
 
 set(COMPONENTS_SRC src/RobotComponent.cpp
                    src/JointsSources.cpp
@@ -31,7 +32,8 @@ set(COMPONENTS_SRC src/RobotComponent.cpp
                    src/YarpSigVectorPortSink.cpp
                    src/UnicycleGeneratorComponent.cpp
                    src/UnicycleReferenceSource.cpp
-                   src/UnicycleJoypadSource.cpp)
+                   src/UnicycleJoypadSource.cpp
+                   src/UnicyclePortSource.cpp)
 
 add_library(${libraryname} ${COMPONENTS_HDR} ${COMPONENTS_SRC})
 target_include_directories(${libraryname} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)

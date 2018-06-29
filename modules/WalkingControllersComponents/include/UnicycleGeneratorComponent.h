@@ -11,6 +11,7 @@
 
 
 #include <UnicycleGenerator.h>
+#include <UnicycleReferenceSource.h>
 #include "iDynTree/Core/VectorFixSize.h"
 #include "yarp/os/BufferedPort.h"
 #include "yarp/os/Bottle.h"
@@ -59,6 +60,8 @@ class WalkingControllers::UnicycleGeneratorComponent
 
     bool m_useFeetGeneration, m_useZMPGeneration, m_useHeightGeneration;
 
+    std::shared_ptr<WalkingControllers::UnicycleReferenceSource> m_inputReference;
+
     enum class GeneratorState {
         NotConfigured,
         Configured,
@@ -84,7 +87,7 @@ public:
      * @param config the options for the pattern generator
      * @return true on success, false otherwise
      */
-    bool configure(yarp::os::Searchable& config);
+    bool configure(yarp::os::Searchable& config, std::shared_ptr<WalkingControllers::UnicycleReferenceSource> referenceSource);
 
     bool generateFirstTrajectories(); //this call is not in a separate thread
 

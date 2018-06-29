@@ -32,7 +32,7 @@ public:
 
     ~YarpSigVectorPortSource();
 
-    bool configure(const std::string& portToConnect, const std::string& localPortName = "");
+    bool configure(const std::string& portToConnect, const std::string& localPortName);
 
     bool read(iDynTree::VectorDynSize &output);
 

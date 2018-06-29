@@ -30,7 +30,7 @@ public:
 
     bool configure(const yarp::os::Searchable& joypadSettings);
 
-    virtual bool getNewReference(const iDynTree::Vector2& currentReferencePosition, double unicycleAngle, iDynTree::Vector2 newReferencePosition) override;
+    virtual bool getNewReference(const iDynTree::Vector2& currentReferencePosition, double unicycleAngle, double timeHorizon, iDynTree::Vector2 newReferencePosition) override;
 };
 
 

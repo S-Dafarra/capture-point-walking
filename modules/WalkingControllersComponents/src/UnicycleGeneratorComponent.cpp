@@ -266,38 +266,30 @@ void UnicycleGeneratorComponent::computeThread()
 
 bool UnicycleGeneratorComponent::privateUpdateTrajectories(double initTime, bool correctLeft, bool correctRight, bool newStanceFootIsLeft, const iDynTree::Transform& measuredLeft, const iDynTree::Transform& measuredRight)
 {
-//    if (m_useJoystick){
-//        double vx, vy;
-//        m_referenceInterface->getCurrentVelVector(vx, vy);
-//        //    yWarning() << "vx = " << vx << "vy = " << vy;
 
-////        iDynTree::Vector2 oldPosition;
-////        if (!m_generator.getPersonPosition(initTime, oldPosition)){
-////            yWarning() << "The requested initTime is outside the previously computed range. Using the previous desired position instead.";
-////            oldPosition = m_desiredPoint;
-////        }
+    iDynTree::Vector2 unicyclePosition; //with respect the measured step
+    unicyclePosition(0) = 0.0;
+    unicyclePosition(1) = newStanceFootIsLeft ? -m_nominalWidth/2 : m_nominalWidth/2;
+    iDynTree::Vector2 newLocalReferencePosition, newReferencePosition;
 
-////        m_desiredPoint(0) = oldPosition(0) + m_plannerHorizon*vx;
-////        m_desiredPoint(1) = oldPosition(1) + m_plannerHorizon*vy;
+    newLocalReferencePosition(0) = unicyclePosition(0) + m_referencePointDistance(0);
+    newLocalReferencePosition(1) = unicyclePosition(1) + m_referencePointDistance(1);
 
-//        iDynTree::Vector2 unicyclePosition; //with respect the measured step
-//        unicyclePosition(0) = 0.0;
-//        unicyclePosition(1) = newStanceFootIsLeft ? -m_nominalWidth/2 : m_nominalWidth/2;
-//        iDynTree::Vector2 newRelativePosition;
+    double theta = newStanceFootIsLeft ? measuredLeft.getRotation().asRPY()(2) : measuredRight.getRotation().asRPY()(2);
+    double s_theta = std::sin(theta);
+    double c_theta = std::cos(theta);
 
-//        newRelativePosition(0) = unicyclePosition(0) + m_referencePointDistance(0) + m_plannerHorizon*vx;
-//        newRelativePosition(1) = unicyclePosition(1) + m_referencePointDistance(1) + m_plannerHorizon*vy;
+    iDynTree::Position stancePosition = newStanceFootIsLeft ? measuredLeft.getPosition() : measuredRight.getPosition();
 
-//        double theta = newStanceFootIsLeft ? measuredLeft.getRotation().asRPY()(2) : measuredRight.getRotation().asRPY()(2);
-//        double s_theta = std::sin(theta);
-//        double c_theta = std::cos(theta);
+    newReferencePosition(0) = c_theta * newLocalReferencePosition(0) - s_theta * newLocalReferencePosition(1) + stancePosition(0);
+    newReferencePosition(1) = s_theta * newLocalReferencePosition(0) + c_theta * newLocalReferencePosition(1) + stancePosition(1);
 
-//        iDynTree::Position stancePosition = newStanceFootIsLeft ? measuredLeft.getPosition() : measuredRight.getPosition();
 
-//        m_desiredPoint(0) = c_theta * newRelativePosition(0) - s_theta * newRelativePosition(1) + stancePosition(0);
-//        m_desiredPoint(1) = s_theta * newRelativePosition(0) + c_theta * newRelativePosition(1) + stancePosition(1);
 
-//    }
+    if (!m_inputReference->getNewReference(newReferencePosition, theta, m_plannerHorizon, m_desiredPoint)) {
+        yError() << "[UnicycleGeneratorComponent::updateTrajectories] Failed to get a new input reference.";
+        return false;
+    }
 
     m_initTime = initTime;
     m_correctLeft = correctLeft;
@@ -334,16 +326,28 @@ UnicycleGeneratorComponent::~UnicycleGeneratorComponent()
     }
 }
 
-bool UnicycleGeneratorComponent::configure(yarp::os::Searchable &config)
+bool UnicycleGeneratorComponent::configure(yarp::os::Searchable &config, std::shared_ptr<UnicycleReferenceSource> referenceSource)
 {
-    if (!readPlannerConfigurationFile(config)){
-        yError() << "Failed while reading the unicycle planner configuration file.";
+    if (m_generatorState == GeneratorState::Configured) {
+        yError() << "[UnicycleGeneratorComponent::configure] Cannot configure twice.";
         return false;
     }
-    yInfo("[UnicycleGeneratorComponent::configurePlanner] Planner configuration files read successfully!");
+
+    if (!referenceSource) {
+        yError() << "[UnicycleGeneratorComponent::configure] Empty referenceSource pointer.";
+        return false;
+    }
+
+    m_inputReference = referenceSource;
+
+    if (!readPlannerConfigurationFile(config)){
+        yError() << "[UnicycleGeneratorComponent::configure] Failed while reading the unicycle planner configuration file.";
+        return false;
+    }
+    yInfo("[UnicycleGeneratorComponent::configure] Planner configuration files read successfully!");
 
     if (!configurePlanner()){
-        yError() << "Failed to configure the unicycle trajectory generator.";
+        yError() << "[UnicycleGeneratorComponent::configure] Failed to configure the unicycle trajectory generator.";
         return false;
     }
 
@@ -356,12 +360,12 @@ bool UnicycleGeneratorComponent::generateFirstTrajectories()
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if (m_generatorState == GeneratorState::NotConfigured){
-        yError() <<"The trajectory generator has not been configured yet.";
+        yError() <<"[UnicycleGeneratorComponent::generateFirstTrajectories] The trajectory generator has not been configured yet.";
         return false;
     }
 
     if (m_generatorState == GeneratorState::Called){
-        yError() <<"Cannot launch the generator twice.";
+        yError() <<"[UnicycleGeneratorComponent::generateFirstTrajectories] Cannot launch the generator twice.";
         return false;
     }
 
@@ -369,28 +373,22 @@ bool UnicycleGeneratorComponent::generateFirstTrajectories()
     m_generator.unicyclePlanner()->clearDesiredTrajectory();
 
     if (!m_generator.unicyclePlanner()->addDesiredTrajectoryPoint(0.0, m_referencePointDistance)){
-        yError() << "Error while setting the first reference.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Error while setting the first reference.";
         return false;
     }
 
-//    if (m_useJoystick){
-//        double vx, vy;
-//        m_referenceInterface->getCurrentVelVector(vx, vy);
-//        //yWarning() << "vx = " << vx << "vy = " << vy;
-//        m_desiredPoint(0) = m_referencePointDistance(0) + m_plannerHorizon*vx;
-//        m_desiredPoint(1) = m_referencePointDistance(1) + m_plannerHorizon*vy;
-//    } else {
-//        m_desiredPoint(0) = m_referencePointDistance(0);
-//        m_desiredPoint(1) = m_referencePointDistance(1);
-//    }
+    if (!m_inputReference->getNewReference(m_referencePointDistance, 0.0, m_plannerHorizon, m_desiredPoint)) {
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Failed to get a new input reference.";
+        return false;
+    }
 
     if (!m_generator.unicyclePlanner()->addDesiredTrajectoryPoint(m_plannerHorizon, m_desiredPoint)){
-        yError() << "Error while setting the new reference.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Error while setting the new reference.";
         return false;
     }
 
     if (!m_generator.generate(0.0, m_dT, m_plannerHorizon)){
-        yError() << "Error while computing the first trajectories.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Error while computing the first trajectories.";
         return false;
     }
 
@@ -404,31 +402,25 @@ bool UnicycleGeneratorComponent::generateFirstTrajectories(const iDynTree::Trans
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if (m_generatorState == GeneratorState::NotConfigured){
-        yError() <<"The trajectory generator has not been configured yet.";
+        yError() <<"[UnicycleGeneratorComponent::generateFirstTrajectories] The trajectory generator has not been configured yet.";
         return false;
     }
 
     if (m_generatorState == GeneratorState::Called){
-        yError() <<"Cannot launch the generator twice.";
+        yError() <<"[UnicycleGeneratorComponent::generateFirstTrajectories] Cannot launch the generator twice.";
         return false;
     }
 
     //reset generator
     m_generator.unicyclePlanner()->clearDesiredTrajectory();
 
-//    if (m_useJoystick){
-//        double vx, vy;
-//        m_referenceInterface->getCurrentVelVector(vx, vy);
-//        //yWarning() << "vx = " << vx << "vy = " << vy;
-//        m_desiredPoint(0) = m_referencePointDistance(0) + m_plannerHorizon*vx;
-//        m_desiredPoint(1) = m_referencePointDistance(1) + m_plannerHorizon*vy;
-//    } else {
-//        m_desiredPoint(0) = m_referencePointDistance(0);
-//        m_desiredPoint(1) = m_referencePointDistance(1);
-//    }
+    if (!m_inputReference->getNewReference(m_referencePointDistance, 0.0, m_plannerHorizon, m_desiredPoint)) {
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Failed to get a new input reference.";
+        return false;
+    }
 
     if (!m_generator.unicyclePlanner()->addDesiredTrajectoryPoint(m_plannerHorizon, m_desiredPoint)){
-        yError() << "Error while setting the new reference.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Error while setting the new reference.";
         return false;
     }
 
@@ -472,22 +464,22 @@ bool UnicycleGeneratorComponent::generateFirstTrajectories(const iDynTree::Trans
     initWeight.initialPosition = (leftToRightTransform.getPosition()(1) - initialCOMPositionInLeft(1))/leftToRightTransform.getPosition()(1);
 
     if (initWeight.initialPosition < 0){
-        yWarning() << "The CoM seems to be on the edge of the left foot. This may cause problems.";
+        yWarning() << "[UnicycleGeneratorComponent::generateFirstTrajectories] The CoM seems to be on the edge of the left foot. This may cause problems.";
         initWeight.initialPosition = 0;
     }
 
     if (initWeight.initialPosition > 1){
-        yWarning() << "The CoM seems to be on the edge of the right foot. This may cause problems.";
+        yWarning() << "[UnicycleGeneratorComponent::generateFirstTrajectories] The CoM seems to be on the edge of the right foot. This may cause problems.";
         initWeight.initialPosition = 1;
     }
 
     if (m_useZMPGeneration && (!m_zmpGenerator->setWeightInitialState(initWeight))) {
-        yError() << "Failed in setting intialWeightState.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Failed in setting intialWeightState.";
         return false;
     }
 
     if (!m_generator.generate(0.0, m_dT, m_plannerHorizon)){
-        yError() << "Error while computing the first trajectories.";
+        yError() << "[UnicycleGeneratorComponent::generateFirstTrajectories] Error while computing the first trajectories.";
         return false;
     }
 
@@ -551,12 +543,12 @@ bool UnicycleGeneratorComponent::updateTrajectories(double initTime, const Initi
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if (m_generatorState == GeneratorState::Called){
-        yError() <<"Cannot launch the generator twice.";
+        yError() <<"[UnicycleGeneratorComponent::updateTrajectories] Cannot launch the generator twice.";
         return false;
     }
 
     if (m_generatorState != GeneratorState::Returned){
-        yError() <<"The trajectory generator has not computed any trajectory yet. Be sure that the trajectory generator is correctly configured and that the method generateFirstTrajectories has been called once.";
+        yError() <<"[UnicycleGeneratorComponent::updateTrajectories] The trajectory generator has not computed any trajectory yet. Be sure that the trajectory generator is correctly configured and that the method generateFirstTrajectories has been called once.";
         return false;
     }
 
@@ -578,12 +570,12 @@ bool UnicycleGeneratorComponent::updateTrajectories(double initTime, bool newSta
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if (m_generatorState == GeneratorState::Called){
-        yError() <<"Cannot launch the generator twice.";
+        yError() <<"[UnicycleGeneratorComponent::updateTrajectories] Cannot launch the generator twice.";
         return false;
     }
 
     if (m_generatorState != GeneratorState::Returned){
-        yError() <<"The trajectory generator has not computed any trajectory yet. Be sure that the trajectory generator is correctly configured and that the method generateFirstTrajectories has been called once.";
+        yError() <<"[UnicycleGeneratorComponent::updateTrajectories] The trajectory generator has not computed any trajectory yet. Be sure that the trajectory generator is correctly configured and that the method generateFirstTrajectories has been called once.";
         return false;
     }
 
@@ -736,7 +728,7 @@ bool UnicycleGeneratorComponent::getCoMHeightAccelerationProfile(std::vector<dou
 bool UnicycleGeneratorComponent::getFeetStandingPeriods(std::vector<bool> &lFootContacts, std::vector<bool> &rFootContacts) const
 {
     if (!trajectoryComputed()){
-        yError() << "No trajectories are available";
+        yError() << "[UnicycleGeneratorComponent::getFeetStandingPeriods] No trajectories are available";
         return false;
     }
 
@@ -748,7 +740,7 @@ bool UnicycleGeneratorComponent::getFeetStandingPeriods(std::vector<bool> &lFoot
 bool UnicycleGeneratorComponent::getWhenUseLeftAsFixed(std::vector<bool> &leftIsFixed) const
 {
     if (!trajectoryComputed()){
-        yError() << "No trajectories are available";
+        yError() << "[UnicycleGeneratorComponent::getWhenUseLeftAsFixed] No trajectories are available";
         return false;
     }
 
@@ -777,7 +769,7 @@ bool UnicycleGeneratorComponent::getInitialStatesAtMergePoints(std::vector<Initi
 bool UnicycleGeneratorComponent::getMergePoints(std::vector<size_t> &mergePoints) const
 {
     if (!trajectoryComputed()){
-        yError() << "No trajectories are available";
+        yError() << "[UnicycleGeneratorComponent::getMergePoints] No trajectories are available";
         return false;
     }
 

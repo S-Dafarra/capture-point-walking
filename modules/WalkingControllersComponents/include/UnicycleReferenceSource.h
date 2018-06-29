@@ -23,7 +23,7 @@ public:
 
     virtual ~UnicycleReferenceSource();
 
-    virtual bool getNewReference(const iDynTree::Vector2& currentReferencePosition, double unicycleAngle, iDynTree::Vector2 newReferencePosition) = 0;
+    virtual bool getNewReference(const iDynTree::Vector2& currentReferencePosition, double unicycleAngle, double timeHorizon, iDynTree::Vector2 newReferencePosition) = 0;
 };
 
 #endif // UNICYCLEREFERENCESOURCE_H
