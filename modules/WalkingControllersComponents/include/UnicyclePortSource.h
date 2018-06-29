@@ -10,7 +10,6 @@
 #define UNICYCLEPORTSOURCE_H
 
 #include <UnicycleReferenceSource.h>
-#include <yarp/os/Searchable.h>
 #include <memory>
 
 namespace WalkingControllers {

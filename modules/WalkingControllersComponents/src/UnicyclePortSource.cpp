@@ -1,5 +1,5 @@
 /**
- * @file UnicyclePortSource.h
+ * @file UnicyclePortSource.cpp
  * @authors Stefano Dafarra <stefano.dafarra@iit.it>
  * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -52,7 +52,7 @@ public:
                     }
                 } else {
                     std::lock_guard<std::mutex> guard(mutex);
-                    yError() << "The input specified in the " << portName << " is supposed to have dimension 2.";
+                    yError() << "[UnicyclePortSource] The input specified in the " << portName << " is supposed to have dimension 2.";
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(5));

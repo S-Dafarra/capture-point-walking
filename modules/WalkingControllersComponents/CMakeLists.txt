@@ -20,7 +20,8 @@ set(COMPONENTS_HDR include/RobotComponent.h
                    include/UnicycleGeneratorComponent.h
                    include/UnicycleReferenceSource.h
                    include/UnicycleJoypadSource.h
-                   include/UnicyclePortSource.h)
+                   include/UnicyclePortSource.h
+                   include/WalkingCoordinatorComponent.h)
 
 set(COMPONENTS_SRC src/RobotComponent.cpp
                    src/JointsSources.cpp
@@ -33,9 +34,12 @@ set(COMPONENTS_SRC src/RobotComponent.cpp
                    src/UnicycleGeneratorComponent.cpp
                    src/UnicycleReferenceSource.cpp
                    src/UnicycleJoypadSource.cpp
-                   src/UnicyclePortSource.cpp)
+                   src/UnicyclePortSource.cpp
+                   src/WalkingCoordinatorComponent.cpp)
 
-add_library(${libraryname} ${COMPONENTS_HDR} ${COMPONENTS_SRC})
+yarp_add_idl(THRIFT "${CMAKE_CURRENT_SOURCE_DIR}/thrifts/walkingCommands.thrift")
+
+add_library(${libraryname} STATIC ${COMPONENTS_HDR} ${COMPONENTS_SRC} ${THRIFT})
 target_include_directories(${libraryname} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_include_directories(${libraryname} SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIR} ${IPOPT_INCLUDE_DIRS})
 target_link_libraries(${libraryname} ${iDynTree_LIBRARIES} ${YARP_LIBRARIES} UnicyclePlanner)
