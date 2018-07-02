@@ -10,12 +10,19 @@
 #define ZMPWALKINGCOORDINATOR_H
 
 #include <WalkingCoordinatorComponent.h>
+#include <RobotComponent.h>
+#include <NonLinearIKComponent.h>
+#include <memory>
 
 namespace WalkingControllers {
     class ZMPWalkingCoordinator;
 }
 
 class WalkingControllers::ZMPWalkingCoordinator : public WalkingControllers::WalkingCoordinatorComponent {
+
+    std::shared_ptr<RobotComponent> m_robotComponent;
+
+    bool m_verbose;
 
     virtual bool prepareWalkingPrivate() override;
 
@@ -36,6 +43,10 @@ public:
     ZMPWalkingCoordinator();
 
     virtual ~ZMPWalkingCoordinator() override;
+
+    std::string helpDescription() const;
+
+    virtual bool close() override;
 
 };
 

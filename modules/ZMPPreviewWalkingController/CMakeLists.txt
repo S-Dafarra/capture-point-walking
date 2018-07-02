@@ -2,11 +2,14 @@
 # All Rights Reserved.
 # Authors: Stefano Dafarra <stefano.dafarra@iit.it>
 
-project(ZMPPreviewWalkingController)
+project(zmpPreviewWalkingController)
 
-set(ZMP_HEADERS)
+set(ZMP_HEADERS include/ZMPWalkingCoordinator.h
+                include/PreviewController.h)
 
-set(ZMP_SOURCES src/main.cpp)
+set(ZMP_SOURCES src/main.cpp
+                src/ZMPWalkingCoordinator.cpp
+                src/PreviewController.cpp)
 
 # linux needs to explicitly ask for pthreads
 if (UNIX AND NOT APPLE)
@@ -17,8 +20,7 @@ endif()
 add_executable(${PROJECT_NAME} ${ZMP_HEADERS} ${ZMP_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${YARP_INCLUDE_DIRS}
-                                                          ${EIGEN3_INCLUDE_DIR}
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIR}
                                                           ${ctrlLib_INCLUDE_DIRS})
 
 list(APPEND LINKLIST ${YARP_LIBRARIES} ${iDynTree_LIBRARIES} ctrlLib WalkingControllersComponents)
@@ -31,5 +33,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${LINKLIST})
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
-include(AddUninstallTarget)
+include(AddInstallAllRobotFiles)
+install_all_robot_files(${CMAKE_CURRENT_SOURCE_DIR}/app)
 
