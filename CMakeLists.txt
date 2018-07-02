@@ -51,5 +51,7 @@ endif()
 
 find_package(YARP REQUIRED)
 
+include(AddUninstallTarget)
+
 add_subdirectory(modules)
 add_subdirectory(app)

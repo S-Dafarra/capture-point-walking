@@ -29,7 +29,7 @@ NonLinearIKComponent::NonLinearIKComponent()
 : m_verbose(false)
 , m_lFootFrame("l_sole")
 , m_rFootFrame("r_sole")
-, m_inertial_R_world(iDynTree::Rotation::Identity())
+, m_gravityFrame_R_world(iDynTree::Rotation::Identity())
 , m_prepared(false)
 , m_configured(false)
 , m_additionalRotationWeight(1.0)
@@ -200,6 +200,26 @@ bool NonLinearIKComponent::configure(yarp::os::Searchable& ikOption, const iDynT
     return true;
 }
 
+bool NonLinearIKComponent::setJointLimits(std::vector<std::pair<double, double> > &jointLimits)
+{
+    if (!m_configured) {
+        yError() << "[NonLinearIKComponent::setJointLimits] First you have to call the configured method.";
+        return false;
+    }
+
+    if (jointLimits.size() != m_ik.fullModel().getNrOfDOFs()) {
+        yError() << "[NonLinearIKComponent::setJointLimits] The input joint limits needs to have dimension equal to the total number of DoFs defined in the provided model.";
+        return false;
+    }
+
+    if (!m_ik.setJointLimits(jointLimits)) {
+        yError() << "[NonLinearIKComponent::setJointLimits] Failed to set joint limits to the IK.";
+        return false;
+    }
+
+    return true;
+}
+
 
 bool NonLinearIKComponent::setModel(const iDynTree::Model& model, const std::vector< std::string >& consideredJoints)
 {
@@ -241,18 +261,14 @@ bool NonLinearIKComponent::setFootFrame(const std::string& foot, const std::stri
     return true;
 }
 
-bool NonLinearIKComponent::updateIntertiaToWorldFrameRotation(const iDynTree::Rotation &inertial_R_worldFrame)
+bool NonLinearIKComponent::updateGravityFrameToWorldFrameRotation(const iDynTree::Rotation &gravityFrame_R_world)
 {
     if (!m_configured) {
-        yError() << "[NonLinearIKComponent::updateIntertiaToWorldFrameRotation] First you have to call the configured method.";
+        yError() << "[NonLinearIKComponent::updateGravityFrameToWorldFrameRotation] First you have to call the configured method.";
         return false;
     }
 
-    if(m_additionalFrame.size() == 0){
-        yError() << "[NonLinearIKComponent::updateIntertiaToWorldFrameRotation] Cannot update the inertia to left frame rotation if no additional frame is provided.";
-        return false;
-    }
-    m_inertial_R_world = inertial_R_worldFrame;
+    m_gravityFrame_R_world = gravityFrame_R_world;
     return true;
 }
 
@@ -417,7 +433,7 @@ bool NonLinearIKComponent::computeIK(const iDynTree::Transform& leftTransform, c
     m_ik.updateTarget(m_rFootFrame, desiredRightTransform);
 
     if(m_additionalFrame.size() != 0){
-        m_ik.updateRotationTarget(m_additionalFrame, leftTransform.getRotation().inverse() * m_inertial_R_world.inverse() * m_additionalRotation, m_additionalRotationWeight);
+        m_ik.updateRotationTarget(m_additionalFrame, leftTransform.getRotation().inverse() * m_gravityFrame_R_world.inverse() * m_additionalRotation, m_additionalRotationWeight);
     }
 
     desiredCoMPosition = leftTransform.inverse() * comPosition;

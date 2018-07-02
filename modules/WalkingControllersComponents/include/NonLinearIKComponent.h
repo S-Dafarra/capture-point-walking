@@ -47,7 +47,7 @@ class WalkingControllers::NonLinearIKComponent {
 
     iDynTree::Transform m_baseTransform;
     iDynTree::Rotation  m_additionalRotation;
-    iDynTree::Rotation  m_inertial_R_world;
+    iDynTree::Rotation  m_gravityFrame_R_world;
 
     iDynTree::VectorDynSize m_jointRegularization, m_guess, m_feedback, m_qResult;
 
@@ -96,9 +96,11 @@ public:
      */
     bool configure(yarp::os::Searchable& ikOption, const iDynTree::Model& model, const std::vector<std::string>& jointList);
 
-    bool updateIntertiaToWorldFrameRotation(const iDynTree::Rotation& inertial_R_worldFrame);
+    bool setJointLimits(std::vector<std::pair<double, double> >& jointLimits);
 
-    bool updateAdditionalRotation(const iDynTree::Rotation& additionalRotation); //Defined in a inertial frame, with the z pointing upwards
+    bool updateGravityFrameToWorldFrameRotation(const iDynTree::Rotation& gravityFrame_R_world);
+
+    bool updateAdditionalRotation(const iDynTree::Rotation& additionalRotation); //Defined in a "gravity frame", with the z pointing upwards
 
     bool setFullModelFeedBack(const iDynTree::VectorDynSize& feedback);
 

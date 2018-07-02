@@ -41,6 +41,7 @@ yarp_add_idl(THRIFT "${CMAKE_CURRENT_SOURCE_DIR}/thrifts/walkingCommands.thrift"
 
 add_library(${libraryname} STATIC ${COMPONENTS_HDR} ${COMPONENTS_SRC} ${THRIFT})
 target_include_directories(${libraryname} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_include_directories(${libraryname} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>) #thrifts
 target_include_directories(${libraryname} SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIR} ${IPOPT_INCLUDE_DIRS})
 target_link_libraries(${libraryname} ${iDynTree_LIBRARIES} ${YARP_LIBRARIES} UnicyclePlanner)
 
