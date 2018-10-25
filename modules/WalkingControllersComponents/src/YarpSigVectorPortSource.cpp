@@ -25,7 +25,7 @@ YarpSigVectorPortSource::~YarpSigVectorPortSource()
     }
 }
 
-bool YarpSigVectorPortSource::configure(const std::string &portToConnect, const std::string &localPortName)
+bool YarpSigVectorPortSource::configure(const std::string &localPortName, const std::string &portToConnect)
 {
     if (m_configured) {
         yError() << "[YarpSigVectorPortSink::configure] Cannot configure twice.";
@@ -37,16 +37,21 @@ bool YarpSigVectorPortSource::configure(const std::string &portToConnect, const 
             yError() << "[YarpSigVectorPortSource::configure] Failed to open local port with name " << localPortName << ".";
             return false;
         }
-    } else {
+    } else if (portToConnect.size() > 0) {
         if (!m_localPort.open(portToConnect + ":local")) {
             yError() << "[YarpSigVectorPortSource::configure] Failed to open local port with name " << portToConnect << ":local.";
             return false;
         }
+    } else {
+        yError() << "[YarpSigVectorPortSource::configure] At least one port name must be specified.";
+        return false;
     }
 
-    if(!yarp::os::Network::connect(portToConnect, localPortName)){
-        yError() << "[YarpSigVectorPortSource::configure] Unable to connect " << localPortName << " to " << portToConnect << ".";
-        return false;
+    if (portToConnect.size() > 0) {
+        if(!yarp::os::Network::connect(portToConnect, localPortName)){
+            yError() << "[YarpSigVectorPortSource::configure] Unable to connect " << localPortName << " to " << portToConnect << ".";
+            return false;
+        }
     }
 
     m_configured = true;

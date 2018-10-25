@@ -5,11 +5,13 @@
 project(zmpPreviewWalkingController)
 
 set(ZMP_HEADERS include/ZMPWalkingCoordinator.h
-                include/PreviewController.h)
+                include/PreviewController.h
+                include/ClockServer.h)
 
 set(ZMP_SOURCES src/main.cpp
                 src/ZMPWalkingCoordinator.cpp
-                src/PreviewController.cpp)
+                src/PreviewController.cpp
+                src/ClockServer.cpp)
 
 # linux needs to explicitly ask for pthreads
 if (UNIX AND NOT APPLE)

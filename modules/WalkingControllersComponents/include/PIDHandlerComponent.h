@@ -37,7 +37,7 @@ namespace WalkingControllers {
 
     class PIDSchedulingObject;
 
-    class WalkingPIDHandler;
+    class PIDHandlerComponent;
 
 }
 
@@ -69,7 +69,7 @@ public:
 
 };
 
-class WalkingControllers::WalkingPIDHandler {
+class WalkingControllers::PIDHandlerComponent {
 
     std::shared_ptr<WalkingControllers::RobotComponent> m_robotComponent;
     bool m_useGainScheduling;
@@ -120,9 +120,9 @@ class WalkingControllers::WalkingPIDHandler {
     bool modifyFixedLists(std::deque<bool> &leftIsFixed, std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed);
 
 public:
-    WalkingPIDHandler();
+    PIDHandlerComponent();
 
-    ~WalkingPIDHandler();
+    ~PIDHandlerComponent();
 
     bool configure(const yarp::os::Bottle& PIDSettings, std::shared_ptr<WalkingControllers::RobotComponent>& robotComponent, double dT);
 

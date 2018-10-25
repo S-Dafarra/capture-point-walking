@@ -1093,9 +1093,12 @@ bool RobotComponent::configure(const yarp::os::Searchable &robotComponentSetting
         tempAxis = nullptr;
     }
 
-    if (jointList.size() != m_pimpl->model.getNrOfJoints()) {
-        yWarning() << errorSign << "Some joints defined in the URDF model have not been found in the control boards. Have them all been considered?";
+    if (!loader.loadReducedModelFromFullModel(m_pimpl->model, jointList)) {
+        yError() << errorSign << "Failed to reduce model.";
+        return false;
     }
+
+    m_pimpl->model = loader.model();
 
     yarp::os::Property deviceOptions;
     deviceOptions.put("device", "remotecontrolboardremapper");

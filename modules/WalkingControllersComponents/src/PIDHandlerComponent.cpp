@@ -21,7 +21,7 @@
 
 using namespace WalkingControllers;
 
-WalkingPIDHandler::WalkingPIDHandler()
+PIDHandlerComponent::PIDHandlerComponent()
     : m_useGainScheduling(false)
     , m_phaseInitTime(0.0)
     , m_previousPhase(PIDPhase::Default)
@@ -34,7 +34,7 @@ WalkingPIDHandler::WalkingPIDHandler()
 {
 }
 
-WalkingPIDHandler::~WalkingPIDHandler()
+PIDHandlerComponent::~PIDHandlerComponent()
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -48,7 +48,7 @@ WalkingPIDHandler::~WalkingPIDHandler()
     }
 }
 
-bool WalkingPIDHandler::parsePIDGroup(const yarp::os::Bottle *group, PIDmap& pidMap)
+bool PIDHandlerComponent::parsePIDGroup(const yarp::os::Bottle *group, PIDmap& pidMap)
 {
     if (!group){
         yError() << "Empty group pointer.";
@@ -87,7 +87,7 @@ bool WalkingPIDHandler::parsePIDGroup(const yarp::os::Bottle *group, PIDmap& pid
     return true;
 }
 
-bool WalkingPIDHandler::parseDefaultPIDGroup(const yarp::os::Bottle *defaultGroup)
+bool PIDHandlerComponent::parseDefaultPIDGroup(const yarp::os::Bottle *defaultGroup)
 {
     if (!defaultGroup){
         yError() << "Empty default group pointer.";
@@ -117,7 +117,7 @@ bool WalkingPIDHandler::parseDefaultPIDGroup(const yarp::os::Bottle *defaultGrou
 
 }
 
-bool WalkingPIDHandler::parsePIDElement(const yarp::os::Value &groupElement, std::string &jointName, yarp::dev::Pid &pid)
+bool PIDHandlerComponent::parsePIDElement(const yarp::os::Value &groupElement, std::string &jointName, yarp::dev::Pid &pid)
 {
     if (groupElement.isList()){
         yarp::os::Bottle* element;
@@ -145,7 +145,7 @@ bool WalkingPIDHandler::parsePIDElement(const yarp::os::Value &groupElement, std
     return true;
 }
 
-bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSettings)
+bool PIDHandlerComponent::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSettings)
 {
     m_useGainScheduling = PIDSettings.check("useGainScheduling", yarp::os::Value(false)).asBool();
     m_firmwareDelay = PIDSettings.check("firmwareDelay", yarp::os::Value(0.0)).asDouble();
@@ -219,7 +219,7 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
     return true;
 }
 
-bool WalkingPIDHandler::fromStringToPIDPhase(const std::string &input, PIDPhase &output)
+bool PIDHandlerComponent::fromStringToPIDPhase(const std::string &input, PIDPhase &output)
 {
     if (input == "SWING_LEFT"){
         output = PIDPhase::SwingLeft;
@@ -234,7 +234,7 @@ bool WalkingPIDHandler::fromStringToPIDPhase(const std::string &input, PIDPhase 
     return true;
 }
 
-bool WalkingPIDHandler::guessPhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed)
+bool PIDHandlerComponent::guessPhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed)
 {
     if (leftIsFixed.size() != rightIsFixed.size()){
         yError() << "Incongruous dimension of the leftIsFixed and rightIsFixed vectors.";
@@ -259,7 +259,7 @@ bool WalkingPIDHandler::guessPhases(const std::deque<bool> &leftIsFixed, const s
     return true;
 }
 
-void WalkingPIDHandler::setPIDThread()
+void PIDHandlerComponent::setPIDThread()
 {
     std::string name;
     PIDmap desiredPIDs;
@@ -288,7 +288,7 @@ void WalkingPIDHandler::setPIDThread()
 }
 
 
-bool WalkingPIDHandler::modifyFixedLists(std::deque<bool> &leftIsFixed, std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed)
+bool PIDHandlerComponent::modifyFixedLists(std::deque<bool> &leftIsFixed, std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -336,7 +336,7 @@ bool WalkingPIDHandler::modifyFixedLists(std::deque<bool> &leftIsFixed, std::deq
     return true;
 }
 
-bool WalkingPIDHandler::getAxisMap()
+bool PIDHandlerComponent::getAxisMap()
 {
     m_axisMap.clear();
 
@@ -353,7 +353,7 @@ bool WalkingPIDHandler::getAxisMap()
     return true;
 }
 
-bool WalkingPIDHandler::getPID(PIDmap& output)
+bool PIDHandlerComponent::getPID(PIDmap& output)
 {
     std::vector<yarp::dev::Pid> allPIDs;
 
@@ -371,7 +371,7 @@ bool WalkingPIDHandler::getPID(PIDmap& output)
     return true;
 }
 
-bool WalkingPIDHandler::setPID(const PIDmap &pidMap)
+bool PIDHandlerComponent::setPID(const PIDmap &pidMap)
 {
     if (pidMap.empty()) {
         yInfo("Empty PID list");
@@ -398,7 +398,7 @@ bool WalkingPIDHandler::setPID(const PIDmap &pidMap)
 }
 
 
-bool WalkingPIDHandler::isPIDElement(const yarp::os::Value &groupElement)
+bool PIDHandlerComponent::isPIDElement(const yarp::os::Value &groupElement)
 {
     bool yes = false;
     yes = groupElement.isList();
@@ -409,7 +409,7 @@ bool WalkingPIDHandler::isPIDElement(const yarp::os::Value &groupElement)
     return yes;
 }
 
-bool WalkingPIDHandler::configure(const yarp::os::Bottle &PIDSettings, std::shared_ptr<WalkingControllers::RobotComponent> &robotComponent, double dT)
+bool PIDHandlerComponent::configure(const yarp::os::Bottle &PIDSettings, std::shared_ptr<WalkingControllers::RobotComponent> &robotComponent, double dT)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -462,7 +462,7 @@ bool WalkingPIDHandler::configure(const yarp::os::Bottle &PIDSettings, std::shar
                 yError() << "[WalkingPIDHandler::configure] Error while setting the default smoothing time. Deactivating gain scheduling.";
                 m_useGainScheduling = false;
             } else {
-                m_handlerThread = std::thread(&WalkingPIDHandler::setPIDThread, this);
+                m_handlerThread = std::thread(&PIDHandlerComponent::setPIDThread, this);
             }
         }
     }
@@ -471,7 +471,7 @@ bool WalkingPIDHandler::configure(const yarp::os::Bottle &PIDSettings, std::shar
     return true;
 }
 
-bool WalkingPIDHandler::setMaximumContactDelay(double maxContactDelay)
+bool PIDHandlerComponent::setMaximumContactDelay(double maxContactDelay)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -484,7 +484,7 @@ bool WalkingPIDHandler::setMaximumContactDelay(double maxContactDelay)
     return true;
 }
 
-bool WalkingPIDHandler::restorePIDs()
+bool PIDHandlerComponent::restorePIDs()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -511,14 +511,14 @@ bool WalkingPIDHandler::restorePIDs()
     return true;
 }
 
-bool WalkingPIDHandler::usingGainScheduling()
+bool PIDHandlerComponent::usingGainScheduling()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
     return m_useGainScheduling;
 }
 
-bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, double time)
+bool PIDHandlerComponent::updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, double time)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -563,7 +563,7 @@ bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const 
     return true;
 }
 
-bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed, double time)
+bool PIDHandlerComponent::updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed, double time)
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -588,7 +588,7 @@ bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const 
     return updatePhases(m_leftIsFixedModified, m_rightIsFixedModified, time);
 }
 
-bool WalkingPIDHandler::reset()
+bool PIDHandlerComponent::reset()
 {
 
     if (!m_configured) {

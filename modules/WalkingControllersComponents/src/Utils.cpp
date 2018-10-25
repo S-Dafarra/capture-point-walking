@@ -232,24 +232,6 @@ bool YarpHelper::getDoubleFromSearchable(const yarp::os::Searchable& config, con
     return true;
 }
 
-bool getBoolFromSearchable(const yarp::os::Searchable& config, const std::string& key, bool& boolean) {
-    yarp::os::Value* value;
-    if(!config.check(key, value))
-    {
-        yError() << "[getNumberFromSearchable] Missing field "<< key;
-        return false;
-    }
-
-    if(!value->isBool())
-    {
-        yError() << "[getNumberFromSearchable] the value is not a bool.";
-        return false;
-    }
-
-    boolean = value->asBool();
-    return true;
-}
-
 void YarpHelper::populateBottleWithStrings(yarp::os::Bottle& bottle, const std::initializer_list<std::string>& strings)
 {
     for(const auto& string : strings)
@@ -290,5 +272,24 @@ bool YarpHelper::getIntFromSearchable(const yarp::os::Searchable &config, const 
     }
 
     number = value->asInt();
+    return true;
+}
+
+bool YarpHelper::getBoolFromSearchable(const yarp::os::Searchable &config, const std::string &key, bool &boolean)
+{
+    yarp::os::Value* value;
+    if(!config.check(key, value))
+    {
+        yError() << "[getNumberFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    if(!value->isBool())
+    {
+        yError() << "[getNumberFromSearchable] the value is not a bool.";
+        return false;
+    }
+
+    boolean = value->asBool();
     return true;
 }
